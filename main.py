@@ -1,87 +1,84 @@
-# import sys
-import time
+"""
+Reimplemeted the "Digital IO Example" code found at the web page:
+https://digilent.com/reference/test-and-measurement/guides/waveforms-using-waveforms-sdk
+using the class API of the dwf package.
 
-# import dwfconstants as dwfc
+The code was only tested with a DIGILENT Analog Discovery 2, however it should work with similar hardware that has
+at least 16 digital input/output pins.
+"""
+
+import time
+from typing import Tuple, Optional
+
 import dwf
 
 
-def run():
-    #
-    # hdwf = dwfc.c_int()
-    # dw_read = dwfc.c_uint32()
-
+def run_sample() -> None:
     print("DWF Version: " + dwf.FDwfGetVersion())
 
-    rm = dwf.DwfEnumeration()
-    num_found_devices = len(rm)
+    device_enum: Tuple[dwf.DwfDevice] = dwf.DwfEnumeration()
+    num_found_devices: int = len(device_enum)
 
     if num_found_devices <= 0:
         raise RuntimeError("No DIGILENT device found")
 
     print(f"Found {num_found_devices} devices")
-    for device in rm:
-        print(f'  index : "{device.idxDevice}", name : "{device.deviceName()}", user : "{device.userName()}"')
+    for rm in device_enum:
+        print(f'  index : "{rm.idxDevice}", name : "{rm.deviceName()}", user : "{rm.userName()}"')
 
-    device = None
-    while device is None:
+    rm: Optional[dwf.DwfDevice] = None
+    while rm is None:
         if num_found_devices == 1:
-            idx = rm[0].idxDevice
+            idx = device_enum[0].idxDevice
         else:
             idx = input("Please enter device index:\n")
-        device = next((x for x in rm if x.idxDevice == idx), None)
+        rm = next((x for x in device_enum if x.idxDevice == idx), None)
 
-    print(f"Opening device {device.deviceName()}")
-    print(f'  index : "{device.idxDevice}"')
-    print(f'  name : "{device.deviceName()}"')
-    print(f'  user : "{device.userName()}"')
-    print(f'  type : "{device.deviceType()[0].name}"')
-    print(f'  revision : "{device.deviceType()[1].value}"')
-    print(f'  serial number : "{device.SN()}"')
-    print(f'  config : "{device.config()}"')
+    device_type: dwf.DwfDevice.DEVID = rm.deviceType()[0]
 
-    # device.open()
-    # device = dwf.DwfDevice(idxDevice=idx)
-    # print(device.SN())
+    print(f'Opening device "{rm.deviceName()}"')
+    print(f'  index : "{rm.idxDevice}"')
+    print(f'  name : "{rm.deviceName()}"')
+    print(f'  user : "{rm.userName()}"')
+    print(f'  type : "{device_type.name}"')
+    print(f'  revision : "{rm.deviceType()[1].value}"')
+    print(f'  serial number : "{rm.SN()}"')
+    print('----------------------------------')
 
+    if rm.deviceType()[0] != rm.DEVID.DISCOVERY2:
+        print(f'WARNING! Device type "{device_type.name}" is not tested')
 
-    #
-    # if dwf_h.value == dwfc.hdwfNone.value:
-    #     print("failed to open device")
-    #     szerr = dwfc.create_string_buffer(512)
-    #     dwf_h.FDwfGetLastErrorMsg(szerr)
-    #     print(str(szerr.value))
-    #     quit()
-    #
-    # dwf_h.FDwfDigitalIOOutputEnableSet(hdwf, dwfc.c_int(0x00FF))
-    #
-    # try:
-    #     # start with 100000000
-    #     pin_state = 0x80
-    #
-    #     while True:
-    #         # calculate new output value
-    #         pin_state = pin_state * 2
-    #         if pin_state > 0x80:
-    #             pin_state = 0x01
-    #
-    #         # set value on enabled IO pins
-    #         dwf_h.FDwfDigitalIOOutputSet(hdwf, dwfc.c_int(pin_state))
-    #         # fetch digital IO information from the device
-    #         dwf_h.FDwfDigitalIOStatus(hdwf)
-    #         # read state of all pins, regardless of output enable
-    #         dwf_h.FDwfDigitalIOInputStatus(hdwf, dwfc.byref(dw_read))
-    #
-    #         # print(dw_read as bitfield (32 digits, removing 0b at the front)
-    #         print("Digital IO Pins: ", bin(dw_read.value)[2:].zfill(16))
-    #         time.sleep(0.5)
-    #
-    # except KeyboardInterrupt:
-    #     # exit on ctrl+c
-    #     pass
-    # finally:
-    #     # close opened connections
-    #     dwf_h.FDwfDeviceClose(hdwf)
+    with rm as device:
+        device: dwf.Dwf
+        dwf_dio = dwf.DwfDigitalIO(device)
+        dwf_dio.outputEnableSet(0x00FF)
+
+        try:
+            # start with 100000000
+            pin_state: int = 0x80
+
+            while True:
+                # calculate new output value
+                pin_state = pin_state * 2
+                if pin_state > 0x80:
+                    pin_state = 0x01
+
+                # set value on enabled IO pins
+                dwf_dio.outputSet(pin_state)
+                # fetch digital IO information from the device
+                dwf_dio.status()
+                # read state of all pins, regardless of output enable
+                dw_read: int = dwf_dio.inputStatus()
+                # print(dw_read as bitfield (32 digits, removing 0b at the front)
+                print("Digital IO Pins: ", bin(dw_read)[2:].zfill(16))
+                time.sleep(0.5)
+
+        except KeyboardInterrupt:
+            pass
 
 
 if __name__ == '__main__':
-    run()
+    try:
+        run_sample()
+    except RuntimeError as err:
+        print(f"Program terminated with error : {err}")
