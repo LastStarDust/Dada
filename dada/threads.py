@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright 2021 AXELSPACE
-import logging
+
 import threading
 from abc import ABC, abstractmethod
 
@@ -14,9 +14,15 @@ class ResumableThread(threading.Thread, ABC):
     def __init__(self, *args, **kwargs):
         super(ResumableThread, self).__init__(*args, **kwargs)
         self.iterations = 0
-        self.daemon = True  # Allow main to exit even if still running.
-        self.paused = True  # Start out paused.
-        self.state = threading.Condition()
+        self.daemon = False  # Do not continue blocking the device if the program crashes
+        self._paused = False  # Start out unpaused
+        # Explicitly using Lock over RLock since the use of self.paused
+        # break reentrancy anyway, and I believe using Lock could allow
+        # one thread to pause the worker, while another resumes; haven't
+        # checked if Condition imposes additional limitations that would
+        # prevent that. In Python 2, use of Lock instead of RLock also
+        # boosts performance.
+        self._pause_cond = threading.Condition(threading.Lock())
 
     def pause(self):
         """
@@ -25,8 +31,11 @@ class ResumableThread(threading.Thread, ABC):
         until the thread is effectively paused.
         :return: None
         """
-        with self.state:
-            self.paused = True  # Block self.
+        self._paused = True
+        # If in sleep, we acquire immediately, otherwise we wait for thread
+        # to release condition. In race, worker will still see self.paused
+        # and begin waiting until it's set back to False
+        self._pause_cond.acquire()
 
     def resume(self):
         """
@@ -35,9 +44,11 @@ class ResumableThread(threading.Thread, ABC):
         until the thread is effectively resumed.
         :return: None
         """
-        with self.state:
-            self.paused = False
-            self.state.notify()  # Unblock self if waiting.
+        self._paused = False
+        # Notify so thread will wake after lock released
+        self._pause_cond.notify()
+        # Now release the lock
+        self._pause_cond.release()
 
     @abstractmethod
     def run(self) -> None:
@@ -59,7 +70,6 @@ class StoppableThread(threading.Thread):
         until the thread is effectively stopped.
         :return: None
         """
-        logging.debug(f"Stopping thread {id(self)}")
         self._stop_event.set()
 
     def is_stopped(self) -> bool:
@@ -68,3 +78,7 @@ class StoppableThread(threading.Thread):
         :return: stop flag
         """
         return self._stop_event.is_set()
+
+    @abstractmethod
+    def run(self) -> None:
+        pass
