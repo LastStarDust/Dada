@@ -8,10 +8,10 @@ import dwf
 from dada.threads import ResumableThread, StoppableThread
 
 
-class UartDebugger(ResumableThread, StoppableThread):
+class UartLogger(ResumableThread, StoppableThread):
     _ACQ_RATE = 100000  # Hz
     _VOLT_RANGE = 5  # V
-    _PROBE_ATTENUATION = 10  # x10 probe
+    _PROBE_ATTENUATION = 1  # x1 probe
     _BUFFER_LENGTH = 8192
     _ENABLED_CHANNELS = [0, 1]
 
@@ -56,7 +56,7 @@ class UartDebugger(ResumableThread, StoppableThread):
         self._device.close()
 
     def run(self) -> None:
-        super(UartDebugger, self).run()
+        super(UartLogger, self).run()
 
         self._dwf_ai.configure(reconfigure=False, start=True)
 
@@ -107,5 +107,18 @@ class UartDebugger(ResumableThread, StoppableThread):
             data_y[channel] = list(self._queue[channel])
             period = 1. / float(self._acquisition_rate)
             data_x[channel] = list(nm.arange(0, len(data_y[channel]) * period, period))
-            self._queue[channel].clear()
         return data_x, data_y
+
+    def get_data_y(self) -> Dict[int, List[float]]:
+        data_y: Dict[int, List[float]] = {}
+        for channel in self._in_chans:
+            data_y[channel] = list(self._queue[channel])
+        return data_y
+
+    def clear_data(self):
+        for channel in self._in_chans:
+            self._queue[channel].clear()
+
+    @property
+    def sample_period(self) -> float:
+        return 1. / float(self._acquisition_rate)
