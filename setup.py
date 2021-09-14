@@ -12,7 +12,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='dada',
-    version='0.0.1',
+    version='0.1.0',
     author='Pintaudi Giorgio',
     author_email='giorgio.pimpa@gmail.com',
     include_package_data=True,
@@ -26,7 +26,7 @@ setup(
     license='Proprietary',
     install_requires=[],
     classifiers=[
-        'Development Status :: 5 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: myself',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
