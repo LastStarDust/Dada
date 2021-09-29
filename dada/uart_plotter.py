@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 import ripyl.protocol.uart as uart
 import ripyl.streaming as stream
 import ripyl.util.plot as rplot
+from ripyl.streaming import AutoLevelError
 
 CHANNEL_COLOR: Dict[int, str] = {0: 'orange', 1: 'blue'}
 BITS: int = 8
@@ -27,22 +28,25 @@ class UartPlotter(object):
     def decoder_process(channel, data, period):
         print(f"Decoding channel : {channel}")
 
-        txd = stream.samples_to_sample_stream(raw_samples=data, sample_period=period)
-        records = list(uart.uart_decode(stream_data=txd, bits=BITS, parity=PARITY, stop_bits=STOP_BITS))
-        success = True
-        for rec in records:
-            if rec.nested_status() != stream.StreamStatus.Ok:
-                success = False
-                print(f"Failed to decode record : {rec}")
-                break
-        if success:
+        try:
             txd = stream.samples_to_sample_stream(raw_samples=data, sample_period=period)
-            channels = OrderedDict([(f'CHANNEL {channel} : {CHANNEL_COLOR[channel]} (V)', txd)])
-            title = "UART debug"
-            plotter = rplot.Plotter()
-            plotter.plot(channels=channels, annotations=records, title=title,
-                         label_format=stream.AnnotationFormat.Text)
-            plotter.show()
+            records = list(uart.uart_decode(stream_data=txd, bits=BITS, parity=PARITY, stop_bits=STOP_BITS))
+            success = True
+            for rec in records:
+                if rec.nested_status() != stream.StreamStatus.Ok:
+                    success = False
+                    print(f"Failed to decode record : {rec}")
+                    break
+            if success:
+                txd = stream.samples_to_sample_stream(raw_samples=data, sample_period=period)
+                channels = OrderedDict([(f'CHANNEL {channel} : {CHANNEL_COLOR[channel]} (V)', txd)])
+                title = "UART debug"
+                plotter = rplot.Plotter()
+                plotter.plot(channels=channels, annotations=records, title=title,
+                             label_format=stream.AnnotationFormat.Text)
+                plotter.show()
+        except AutoLevelError as error:
+            print(f"Error when trying to decoded UART protocol : {error}")
 
     def plot(self):
         for name, data in self._samples.items():
