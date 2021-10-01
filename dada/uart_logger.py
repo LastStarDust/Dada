@@ -9,7 +9,7 @@ from dada.threads import ResumableThread, StoppableThread
 
 
 class UartLogger(ResumableThread, StoppableThread):
-    _ACQ_RATE = 100000  # Hz
+    _ACQ_RATE = 1000000  # Hz
     _VOLT_RANGE = 5  # V
     _PROBE_ATTENUATION = 1  # x1 probe
     _BUFFER_LENGTH = 8192
